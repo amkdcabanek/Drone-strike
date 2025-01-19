@@ -1,0 +1,115 @@
+try:
+    from drone import Drone, Missile
+    import sys
+    import random
+    import math
+    import os
+    import getopt
+    import pygame
+    from socket import *
+    from pygame.locals import *
+except ImportError as err:
+    print(f"couldn't load module. {err}")
+    sys.exit(2)
+
+pygame.init()
+
+screenWidth = 1280
+screenHeight = 700
+UI_SIZE = 50
+
+UI_COLOR = (243, 216, 60)
+
+font = pygame.font.SysFont('arial', 40)
+altitudeSurface = font.render("Altitude :", True, UI_COLOR)
+throttleSurface = font.render("Throttle :", True, UI_COLOR)
+speedSurface = font.render("Speed :", True, UI_COLOR)
+velocityXSurface = font.render("Velocity X :", True, UI_COLOR)
+velocityYSurface = font.render("Velocity Y :", True, UI_COLOR)
+
+screen = pygame.display.set_mode((screenWidth + UI_SIZE, screenHeight + UI_SIZE*2))
+pygame.display.set_caption("Controller")
+
+clock = pygame.time.Clock()
+
+drone = Drone(screenWidth, screenHeight)
+droneGroup = pygame.sprite.GroupSingle()
+droneGroup.add(drone)
+missile = Missile(screenWidth, screenHeight)
+
+UDP_IP = "26.203.108.55"
+UDP_PORT = 5005
+sock = socket(AF_INET, SOCK_DGRAM)
+sock.bind(("", 5006))
+
+UDP_IP2 = "26.203.108.55"
+UDP_PORT2 = 5007
+sock2 = socket(AF_INET, SOCK_DGRAM)
+sock2.bind(("", 5008))
+
+while True:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+
+    droneGroup.update()
+    missile.update()
+
+    data = f"{drone.altitude},{drone.throttle},{drone.speed},{drone.velocityX},{drone.velocityY}"
+    sock.sendto(data.encode(), (UDP_IP, UDP_PORT))
+
+    data2 = f"{missile.speed},{missile.velocityX},{missile.velocityY}"
+    sock2.sendto(data2.encode(), (UDP_IP2, UDP_PORT2))
+
+    try:
+        sock.settimeout(0.1)
+        modified_data, addr = sock.recvfrom(1024)
+        mod_altitude, mod_throttle, mod_speed, mod_velocityX, mod_velocityY = map(float, modified_data.decode().split(","))
+        drone.altitude = mod_altitude
+        drone.throttle = mod_throttle
+        drone.speed = mod_speed
+        drone.velocityX = mod_velocityX
+        drone.velocityY = mod_velocityY
+
+        sock2.settimeout(0.1)
+        modified_data2, addr2 = sock2.recvfrom(1024)
+        mod_speed2, mod_velocityX2, mod_velocityY2 = map(float, modified_data2.decode().split(","))
+        missile.speed = mod_speed2
+        missile.velocityX = mod_velocityX2
+        missile.velocityY = mod_velocityY2
+    except timeout:
+        pass
+
+    screen.fill((0, 0, 0))
+
+    screen.blit(altitudeSurface, (370, 640, 50, 50))
+    altUI = font.render(str(drone.altitude), True, UI_COLOR)
+    screen.blit(altUI, (570, 640, 50, 50))
+
+    screen.blit(throttleSurface, (70, 640, 50, 50))
+    thrUI = font.render(str(drone.throttle), True, UI_COLOR)
+    screen.blit(thrUI, (270, 640, 50, 50))
+
+    screen.blit(speedSurface, (670, 640, 50, 50))
+    speedUI = font.render(str(drone.speed), True, UI_COLOR)
+    screen.blit(speedUI, (870, 640, 50, 50))
+
+    screen.blit(velocityXSurface, (970, 640, 50, 50))
+    velXUI = font.render(str(drone.velocityX), True, UI_COLOR)
+    screen.blit(velXUI, (1170, 640, 50, 50))
+
+    screen.blit(velocityYSurface, (1070, 640, 50, 50))
+    velYUI = font.render(str(drone.velocityY), True, UI_COLOR)
+    screen.blit(velYUI, (1270, 640, 50, 50))
+
+    pygame.draw.rect(screen, UI_COLOR, (10, 10, 1310, 710), 2, 0, 60, 60, 60, 60)
+
+    screen.blit(drone.image, drone.rect)
+
+    if drone.launch == True:
+        screen.blit(missile.image, missile.rect)
+
+
+    pygame.display.update()
+    clock.tick(60)

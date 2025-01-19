@@ -1,0 +1,31 @@
+import socket
+import random
+import time
+
+
+UDP_IP = "0.0.0.0"
+UDP_PORT_RECEIVE = 5007
+UDP_PORT_SEND = 5008
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind((UDP_IP, UDP_PORT_RECEIVE))
+
+def modify_value(value, min_range, max_range):
+    return round(value + random.uniform(min_range, max_range), 2)
+
+while True:
+    try:
+        data, addr = sock.recvfrom(1024)
+        speed, velocityX, velocityY = map(float, data.decode().split(","))
+    except ValueError:
+        continue
+
+
+    mod_speed = modify_value(speed, -0.1, 0.1)
+    mod_velocityX = modify_value(velocityX, -0.1, 0.1)
+    mod_velocityY = modify_value(velocityY, -0.1, 0.1)
+
+    modified_data = f"{mod_speed},{mod_velocityX},{mod_velocityY}"
+    sock.sendto(modified_data.encode(), (addr[0], UDP_PORT_SEND))
+
+    time.sleep(0.05)
